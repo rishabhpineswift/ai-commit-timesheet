@@ -21,7 +21,8 @@ fi
 : "${TIMESHEET_AFTER_SHA:?}"
 
 DATE_UTC=$(date -u -d "$TIMESHEET_TIMESTAMP" +%Y-%m-%d)
-MONTH_UTC=$(date -u -d "$TIMESHEET_TIMESTAMP" +%Y-%m)
+YEAR_UTC=$(date -u -d "$TIMESHEET_TIMESTAMP" +%Y)
+MONTH_UTC=$(date -u -d "$TIMESHEET_TIMESTAMP" +%m)
 
 WORKDIR=$(mktemp -d)
 trap 'rm -rf "$WORKDIR"' EXIT
@@ -36,14 +37,14 @@ slugify() {
 }
 
 regenerate_contributor_summary() {
-  local dir="$1" slug="$2" month="$3"
+  local dir="$1" label="$2"
   local log="$dir/log.csv" summary="$dir/summary.md"
   local totals
   totals=$(awk -F',' 'NR>1 { for(i=1;i<=9;i++) gsub(/"/,"",$i); commits+=$4; files+=$5; ins+=$6; del+=$7; pushes++ } END { printf "%d,%d,%d,%d,%d", pushes+0, commits+0, files+0, ins+0, del+0 }' "$log")
   IFS=',' read -r pushes commits files ins del <<< "$totals"
 
   {
-    echo "# ${slug} — ${month}"
+    echo "# ${label}"
     echo
     echo "**Totals:** ${commits} commits, ${files} files changed, +${ins}/-${del} lines, across ${pushes} pushes."
     echo
@@ -51,6 +52,19 @@ regenerate_contributor_summary() {
     echo
     awk -F',' 'NR>1 { for(i=1;i<=9;i++) gsub(/"/,"",$i); printf "- **%s** (%s, %s): %s\n", $1, $2, $3, $8 }' "$log"
   } > "$summary"
+}
+
+# Appends a row to $1/log.csv (creating it with a header if needed) and
+# regenerates $1/summary.md from the full file.
+append_and_summarize() {
+  local dir="$1" label="$2"
+  local log="${dir}/log.csv"
+  mkdir -p "$dir"
+  if [ ! -f "$log" ]; then
+    echo "timestamp,project,branch,commits,files_changed,insertions,deletions,summary,after_sha" > "$log"
+  fi
+  echo "\"${TIMESHEET_TIMESTAMP}\",\"${PROJECT_NAME}\",\"${TIMESHEET_BRANCH}\",${TIMESHEET_COMMITS},${TIMESHEET_FILES_CHANGED},${TIMESHEET_INSERTIONS},${TIMESHEET_DELETIONS},\"${TIMESHEET_SUMMARY}\",\"${TIMESHEET_AFTER_SHA}\"" >> "$log"
+  regenerate_contributor_summary "$dir" "$label"
 }
 
 DAILY_FILE="projects/${PROJECT_NAME}/daily/${DATE_UTC}.csv"
@@ -65,14 +79,16 @@ for author in "${AUTHOR_LIST[@]}"; do
   author=$(echo "$author" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
   [ -z "$author" ] && continue
   SLUG=$(slugify "$author")
-  CONTRIB_DIR="contributors/${SLUG}/${MONTH_UTC}"
-  LOG_FILE="${CONTRIB_DIR}/log.csv"
-  mkdir -p "$CONTRIB_DIR"
-  if [ ! -f "$LOG_FILE" ]; then
-    echo "timestamp,project,branch,commits,files_changed,insertions,deletions,summary,after_sha" > "$LOG_FILE"
-  fi
-  echo "\"${TIMESHEET_TIMESTAMP}\",\"${PROJECT_NAME}\",\"${TIMESHEET_BRANCH}\",${TIMESHEET_COMMITS},${TIMESHEET_FILES_CHANGED},${TIMESHEET_INSERTIONS},${TIMESHEET_DELETIONS},\"${TIMESHEET_SUMMARY}\",\"${TIMESHEET_AFTER_SHA}\"" >> "$LOG_FILE"
-  regenerate_contributor_summary "$CONTRIB_DIR" "$SLUG" "$MONTH_UTC"
+
+  # Per-project view: projects/<project>/contributors/<slug>/<year>/<month>/
+  append_and_summarize \
+    "projects/${PROJECT_NAME}/contributors/${SLUG}/${YEAR_UTC}/${MONTH_UTC}" \
+    "${SLUG} — ${PROJECT_NAME} — ${YEAR_UTC}-${MONTH_UTC}"
+
+  # Cross-project view: contributors/<slug>/<year>/<month>/
+  append_and_summarize \
+    "contributors/${SLUG}/${YEAR_UTC}/${MONTH_UTC}" \
+    "${SLUG} — ${YEAR_UTC}-${MONTH_UTC}"
 done
 
 git add -A
