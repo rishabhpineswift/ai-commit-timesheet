@@ -19,6 +19,8 @@ fi
 : "${TIMESHEET_DELETIONS:?}"
 : "${TIMESHEET_SUMMARY:?}"
 : "${TIMESHEET_AFTER_SHA:?}"
+QUALITY_RATING="${TIMESHEET_QUALITY_RATING:-Unrated}"
+QUALITY_NOTES="${TIMESHEET_QUALITY_NOTES:-}"
 
 DATE_UTC=$(date -u -d "$TIMESHEET_TIMESTAMP" +%Y-%m-%d)
 YEAR_UTC=$(date -u -d "$TIMESHEET_TIMESTAMP" +%Y)
@@ -40,17 +42,17 @@ regenerate_contributor_summary() {
   local dir="$1" label="$2"
   local log="$dir/log.csv" summary="$dir/summary.md"
   local totals
-  totals=$(awk -F',' 'NR>1 { for(i=1;i<=9;i++) gsub(/"/,"",$i); commits+=$4; files+=$5; ins+=$6; del+=$7; pushes++ } END { printf "%d,%d,%d,%d,%d", pushes+0, commits+0, files+0, ins+0, del+0 }' "$log")
-  IFS=',' read -r pushes commits files ins del <<< "$totals"
+  totals=$(awk -F',' 'NR>1 { for(i=1;i<=11;i++) gsub(/"/,"",$i); commits+=$4; files+=$5; ins+=$6; del+=$7; pushes++; if ($9=="Poor") poor++ } END { printf "%d,%d,%d,%d,%d,%d", pushes+0, commits+0, files+0, ins+0, del+0, poor+0 }' "$log")
+  IFS=',' read -r pushes commits files ins del poor <<< "$totals"
 
   {
     echo "# ${label}"
     echo
-    echo "**Totals:** ${commits} commits, ${files} files changed, +${ins}/-${del} lines, across ${pushes} pushes."
+    echo "**Totals:** ${commits} commits, ${files} files changed, +${ins}/-${del} lines, across ${pushes} pushes${poor:+, ${poor} flagged Poor quality}."
     echo
     echo "## Daily summaries"
     echo
-    awk -F',' 'NR>1 { for(i=1;i<=9;i++) gsub(/"/,"",$i); printf "- **%s** (%s, %s): %s\n", $1, $2, $3, $8 }' "$log"
+    awk -F',' 'NR>1 { for(i=1;i<=11;i++) gsub(/"/,"",$i); printf "- **%s** (%s, %s) [%s]: %s\n", $1, $2, $3, $9, $8 }' "$log"
   } > "$summary"
 }
 
@@ -61,18 +63,18 @@ append_and_summarize() {
   local log="${dir}/log.csv"
   mkdir -p "$dir"
   if [ ! -f "$log" ]; then
-    echo "timestamp,project,branch,commits,files_changed,insertions,deletions,summary,after_sha" > "$log"
+    echo "timestamp,project,branch,commits,files_changed,insertions,deletions,summary,quality_rating,quality_notes,after_sha" > "$log"
   fi
-  echo "\"${TIMESHEET_TIMESTAMP}\",\"${PROJECT_NAME}\",\"${TIMESHEET_BRANCH}\",${TIMESHEET_COMMITS},${TIMESHEET_FILES_CHANGED},${TIMESHEET_INSERTIONS},${TIMESHEET_DELETIONS},\"${TIMESHEET_SUMMARY}\",\"${TIMESHEET_AFTER_SHA}\"" >> "$log"
+  echo "\"${TIMESHEET_TIMESTAMP}\",\"${PROJECT_NAME}\",\"${TIMESHEET_BRANCH}\",${TIMESHEET_COMMITS},${TIMESHEET_FILES_CHANGED},${TIMESHEET_INSERTIONS},${TIMESHEET_DELETIONS},\"${TIMESHEET_SUMMARY}\",\"${QUALITY_RATING}\",\"${QUALITY_NOTES}\",\"${TIMESHEET_AFTER_SHA}\"" >> "$log"
   regenerate_contributor_summary "$dir" "$label"
 }
 
 DAILY_FILE="projects/${PROJECT_NAME}/daily/${DATE_UTC}.csv"
 mkdir -p "$(dirname "$DAILY_FILE")"
 if [ ! -f "$DAILY_FILE" ]; then
-  echo "timestamp,branch,authors,commits,files_changed,insertions,deletions,summary,after_sha" > "$DAILY_FILE"
+  echo "timestamp,branch,authors,commits,files_changed,insertions,deletions,summary,quality_rating,quality_notes,after_sha" > "$DAILY_FILE"
 fi
-echo "\"${TIMESHEET_TIMESTAMP}\",\"${TIMESHEET_BRANCH}\",\"${TIMESHEET_AUTHORS}\",${TIMESHEET_COMMITS},${TIMESHEET_FILES_CHANGED},${TIMESHEET_INSERTIONS},${TIMESHEET_DELETIONS},\"${TIMESHEET_SUMMARY}\",\"${TIMESHEET_AFTER_SHA}\"" >> "$DAILY_FILE"
+echo "\"${TIMESHEET_TIMESTAMP}\",\"${TIMESHEET_BRANCH}\",\"${TIMESHEET_AUTHORS}\",${TIMESHEET_COMMITS},${TIMESHEET_FILES_CHANGED},${TIMESHEET_INSERTIONS},${TIMESHEET_DELETIONS},\"${TIMESHEET_SUMMARY}\",\"${QUALITY_RATING}\",\"${QUALITY_NOTES}\",\"${TIMESHEET_AFTER_SHA}\"" >> "$DAILY_FILE"
 
 IFS=';' read -ra AUTHOR_LIST <<< "$TIMESHEET_AUTHORS"
 for author in "${AUTHOR_LIST[@]}"; do

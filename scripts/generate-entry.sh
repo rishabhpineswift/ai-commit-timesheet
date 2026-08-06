@@ -63,35 +63,56 @@ messages below.
 Commit messages (for context, not to be taken at face value):
 ${COMMIT_MESSAGES}
 
-Write ONE line, under 40 words, for a non-engineer manager reading a
-timesheet: start with a category tag (Feature:/Fix:/Refactor:/Chore:/Docs:/
-Test:), then a plain-language sentence describing what the code actually
-does now and why, based on your own reading of the diff — not the commit
-message. If the diff looks risky, incomplete, or inconsistent with the
-commit message, say so briefly instead of just describing intent.
+Output EXACTLY two lines, nothing else — no preamble, no markdown, no
+quotes:
 
-Output ONLY that one line. No preamble, no markdown, no quotes, no
-newlines.
+Line 1 — under 40 words, for a non-engineer manager reading a timesheet:
+start with a category tag (Feature:/Fix:/Refactor:/Chore:/Docs:/Test:), then
+a plain-language sentence describing what the code actually does now and
+why, based on your own reading of the diff — not the commit message. If the
+diff looks risky, incomplete, or inconsistent with the commit message, say
+so briefly instead of just describing intent.
+
+Line 2 — a code-quality verdict on this push, from your own reading of the
+diff: start with exactly "Quality: Good", "Quality: Fair", or "Quality: Poor",
+then " — " and a short reason. Judge on correctness, obvious bugs, missing
+error handling, missing tests for risky logic, security issues, and code
+smells — not on style preference. Use Good when you see nothing concerning,
+Fair for minor concerns worth a second look, Poor for real bugs/security
+issues/risky untested logic. If nothing meaningful changed (e.g. a version
+bump, generated file, config-only change), say "Quality: Good — no
+functional code to assess."
 EOF
 )
 
+RAW_OUTPUT=""
 if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
-  SUMMARY=$(claude -p "$PROMPT" --output-format text \
+  RAW_OUTPUT=$(claude -p "$PROMPT" --output-format text \
     --allowedTools "Bash(git diff:*)" "Bash(git show:*)" "Bash(git log:*)" "Read" "Grep" "Glob" \
     2>/dev/null || echo "")
 fi
+
+SUMMARY=$(echo "$RAW_OUTPUT" | sed -n '1p')
+QUALITY=$(echo "$RAW_OUTPUT" | sed -n '2p')
+
 if [ -z "${SUMMARY:-}" ]; then
   SUMMARY=$(echo "$COMMIT_MESSAGES" | head -1 | sed 's/^- //')
 fi
+if [ -z "${QUALITY:-}" ]; then
+  QUALITY="Quality: Unrated — AI review unavailable for this push."
+fi
 
 SUMMARY=$(echo "$SUMMARY" | tr '\n' ' ' | tr ',' ';' | sed -e 's/"/'"'"'/g' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+QUALITY=$(echo "$QUALITY" | tr '\n' ' ' | tr ',' ';' | sed -e 's/"/'"'"'/g' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+QUALITY_RATING=$(echo "$QUALITY" | grep -oE '^Quality: [A-Za-z]+' | sed 's/^Quality: //' || echo "Unrated")
+QUALITY_NOTES=$(echo "$QUALITY" | sed -E 's/^Quality: [A-Za-z]+ ?—? ?//')
 
 mkdir -p "$(dirname "$TIMESHEET_PATH")" 2>/dev/null || true
 if [ ! -f "$TIMESHEET_PATH" ]; then
-  echo "timestamp,branch,authors,commits,files_changed,insertions,deletions,summary,after_sha" > "$TIMESHEET_PATH"
+  echo "timestamp,branch,authors,commits,files_changed,insertions,deletions,summary,quality_rating,quality_notes,after_sha" > "$TIMESHEET_PATH"
 fi
 
-echo "\"${TIMESTAMP}\",\"${BRANCH_NAME}\",\"${AUTHORS}\",${COMMIT_COUNT},${FILES_CHANGED},${INSERTIONS},${DELETIONS},\"${SUMMARY}\",\"${AFTER_SHA}\"" >> "$TIMESHEET_PATH"
+echo "\"${TIMESTAMP}\",\"${BRANCH_NAME}\",\"${AUTHORS}\",${COMMIT_COUNT},${FILES_CHANGED},${INSERTIONS},${DELETIONS},\"${SUMMARY}\",\"${QUALITY_RATING}\",\"${QUALITY_NOTES}\",\"${AFTER_SHA}\"" >> "$TIMESHEET_PATH"
 
 echo "Recorded timesheet entry for ${AFTER_SHA} on ${BRANCH_NAME}"
 
@@ -107,6 +128,8 @@ if [ -n "${GITHUB_ENV:-}" ]; then
     echo "TIMESHEET_INSERTIONS=${INSERTIONS}"
     echo "TIMESHEET_DELETIONS=${DELETIONS}"
     echo "TIMESHEET_SUMMARY=${SUMMARY}"
+    echo "TIMESHEET_QUALITY_RATING=${QUALITY_RATING}"
+    echo "TIMESHEET_QUALITY_NOTES=${QUALITY_NOTES}"
     echo "TIMESHEET_AFTER_SHA=${AFTER_SHA}"
   } >> "$GITHUB_ENV"
 fi
