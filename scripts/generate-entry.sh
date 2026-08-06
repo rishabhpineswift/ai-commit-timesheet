@@ -17,22 +17,22 @@ if [ "$AFTER_SHA" = "$ZERO_SHA" ]; then
 fi
 
 if [ "$BEFORE_SHA" = "$ZERO_SHA" ] || ! git cat-file -e "$BEFORE_SHA" 2>/dev/null; then
-  # New branch, or before-sha not reachable (shallow history) — diff against empty tree
-  # and only summarize the tip commit's own message range.
-  BASE_SHA="$EMPTY_TREE"
+  # New branch, or before-sha not reachable (shallow history) — we don't know
+  # what's "new" on this branch vs. shared history, so look at only the last
+  # 20 commits reachable from the tip and diff against their oldest parent
+  # (NOT an empty tree — that would diff the entire repo on a branch cut from
+  # an existing large history).
   LOG_RANGE="$AFTER_SHA"
   LOG_RANGE_LIMIT="-n 20"
+  COMMIT_COUNT=$(git rev-list $LOG_RANGE_LIMIT --count $LOG_RANGE)
+  BASE_SHA=$(git rev-parse "${AFTER_SHA}~${COMMIT_COUNT}" 2>/dev/null || echo "$EMPTY_TREE")
 else
   BASE_SHA="$BEFORE_SHA"
   LOG_RANGE="${BEFORE_SHA}..${AFTER_SHA}"
   LOG_RANGE_LIMIT=""
-fi
-
-if [ -n "$LOG_RANGE_LIMIT" ]; then
-  COMMIT_COUNT=$(git rev-list $LOG_RANGE_LIMIT --count $LOG_RANGE)
-else
   COMMIT_COUNT=$(git rev-list --count $LOG_RANGE)
 fi
+
 if [ "$COMMIT_COUNT" = "0" ]; then
   echo "No new commits in range, nothing to record." >&2
   exit 0
@@ -50,9 +50,12 @@ FILES_CHANGED=${FILES_CHANGED:-0}
 INSERTIONS=${INSERTIONS:-0}
 DELETIONS=${DELETIONS:-0}
 
-DIFF_TEXT=$(git diff "$BASE_SHA" "$AFTER_SHA" -- . \
+DIFF_FILE=$(mktemp)
+trap 'rm -f "$DIFF_FILE"' EXIT
+git diff "$BASE_SHA" "$AFTER_SHA" -- . \
   ':(exclude)*.lock' ':(exclude)package-lock.json' ':(exclude)pnpm-lock.yaml' ':(exclude)yarn.lock' \
-  | head -c "$MAX_DIFF_CHARS")
+  > "$DIFF_FILE"
+DIFF_TEXT=$(head -c "$MAX_DIFF_CHARS" "$DIFF_FILE")
 
 PROMPT=$(cat <<EOF
 You are summarizing a git push for a team timesheet log. Read the commit
