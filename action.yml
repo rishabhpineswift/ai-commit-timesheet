@@ -72,4 +72,15 @@ runs:
         git config user.email "${{ inputs.git-user-email }}"
         git add "${{ inputs.timesheet-path }}"
         git commit -m "chore: update timesheet [skip ci]"
-        git push
+        branch="${{ github.ref_name }}"
+        for attempt in 1 2 3 4 5; do
+          if git push origin "HEAD:$branch"; then
+            exit 0
+          fi
+          echo "Push rejected (attempt $attempt) — another run likely pushed first. Rebasing and retrying..."
+          sleep $((RANDOM % 5 + 1))
+          git fetch origin "$branch"
+          git rebase "origin/$branch"
+        done
+        echo "Failed to push timesheet after retries."
+        exit 1
