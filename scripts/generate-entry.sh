@@ -28,7 +28,11 @@ else
   LOG_RANGE_LIMIT=""
 fi
 
-COMMIT_COUNT=$(git log $LOG_RANGE_LIMIT --pretty=format:'%H' $LOG_RANGE | wc -l | tr -d ' ')
+if [ -n "$LOG_RANGE_LIMIT" ]; then
+  COMMIT_COUNT=$(git rev-list $LOG_RANGE_LIMIT --count $LOG_RANGE)
+else
+  COMMIT_COUNT=$(git rev-list --count $LOG_RANGE)
+fi
 if [ "$COMMIT_COUNT" = "0" ]; then
   echo "No new commits in range, nothing to record." >&2
   exit 0
