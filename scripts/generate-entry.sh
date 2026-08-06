@@ -37,7 +37,7 @@ if [ "$COMMIT_COUNT" = "0" ]; then
   exit 0
 fi
 
-AUTHORS=$(git log $LOG_RANGE_LIMIT --pretty=format:'%an' $LOG_RANGE | tr ',' ' ' | sort -u | paste -sd ';' -)
+AUTHORS=$(git log $LOG_RANGE_LIMIT --pretty=format:'%an' $LOG_RANGE | tr ',' ' ' | { grep -viE '^(ai-commit-timesheet-bot|github-actions(\[bot\])?|.*\[bot\])$' || true; } | sort -u | paste -sd ';' -)
 COMMIT_MESSAGES=$(git log $LOG_RANGE_LIMIT --pretty=format:'- %s' $LOG_RANGE)
 TIMESTAMP=$(git log -1 --pretty=format:'%aI' "$AFTER_SHA")
 
