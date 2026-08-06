@@ -62,7 +62,7 @@ echo "\"${TIMESHEET_TIMESTAMP}\",\"${TIMESHEET_BRANCH}\",\"${TIMESHEET_AUTHORS}\
 
 IFS=';' read -ra AUTHOR_LIST <<< "$TIMESHEET_AUTHORS"
 for author in "${AUTHOR_LIST[@]}"; do
-  author=$(echo "$author" | xargs)
+  author=$(echo "$author" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
   [ -z "$author" ] && continue
   SLUG=$(slugify "$author")
   CONTRIB_DIR="contributors/${SLUG}/${MONTH_UTC}"

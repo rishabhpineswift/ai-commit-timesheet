@@ -84,7 +84,7 @@ if [ -z "${SUMMARY:-}" ]; then
   SUMMARY=$(echo "$COMMIT_MESSAGES" | head -1 | sed 's/^- //')
 fi
 
-SUMMARY=$(echo "$SUMMARY" | tr '\n' ' ' | tr ',' ';' | sed 's/"/'"'"'/g' | xargs)
+SUMMARY=$(echo "$SUMMARY" | tr '\n' ' ' | tr ',' ';' | sed -e 's/"/'"'"'/g' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
 mkdir -p "$(dirname "$TIMESHEET_PATH")" 2>/dev/null || true
 if [ ! -f "$TIMESHEET_PATH" ]; then
