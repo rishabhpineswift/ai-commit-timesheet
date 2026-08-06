@@ -77,7 +77,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: rishabhpineswift/ai-commit-timesheet@main
+      - uses: rishabhpineswift/ai-commit-timesheet@v1
         with:
           claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
