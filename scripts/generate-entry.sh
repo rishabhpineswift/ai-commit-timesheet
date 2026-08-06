@@ -63,8 +63,8 @@ messages below.
 Commit messages (for context, not to be taken at face value):
 ${COMMIT_MESSAGES}
 
-Output EXACTLY two lines, nothing else — no preamble, no markdown, no
-quotes:
+You MUST output EXACTLY two lines, nothing else — no preamble, no markdown,
+no quotes, and never skip line 2 even for a trivial change:
 
 Line 1 — under 40 words, for a non-engineer manager reading a timesheet:
 start with a category tag (Feature:/Fix:/Refactor:/Chore:/Docs:/Test:), then
@@ -73,15 +73,20 @@ why, based on your own reading of the diff — not the commit message. If the
 diff looks risky, incomplete, or inconsistent with the commit message, say
 so briefly instead of just describing intent.
 
-Line 2 — a code-quality verdict on this push, from your own reading of the
-diff: start with exactly "Quality: Good", "Quality: Fair", or "Quality: Poor",
-then " — " and a short reason. Judge on correctness, obvious bugs, missing
-error handling, missing tests for risky logic, security issues, and code
-smells — not on style preference. Use Good when you see nothing concerning,
-Fair for minor concerns worth a second look, Poor for real bugs/security
-issues/risky untested logic. If nothing meaningful changed (e.g. a version
-bump, generated file, config-only change), say "Quality: Good — no
-functional code to assess."
+Line 2 — REQUIRED, a code-quality verdict on this push, from your own
+reading of the diff: start with exactly "Quality: Good", "Quality: Fair",
+or "Quality: Poor", then " — " and a short reason. Judge on correctness,
+obvious bugs, missing error handling, missing tests for risky logic,
+security issues, and code smells — not on style preference. Use Good when
+you see nothing concerning, Fair for minor concerns worth a second look,
+Poor for real bugs/security issues/risky untested logic. If nothing
+meaningful changed (e.g. a version bump, generated file, config-only
+change), still output line 2 as: "Quality: Good — no functional code to
+assess."
+
+Example of the exact two-line shape (do not copy the content, just the shape):
+Fix: Corrects the off-by-one error in the pagination helper so the last page of results now loads.
+Quality: Fair — the fix is correct but the new branch has no test covering the last-page case.
 EOF
 )
 
@@ -92,8 +97,8 @@ if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
     2>/dev/null || echo "")
 fi
 
-SUMMARY=$(echo "$RAW_OUTPUT" | sed -n '1p')
-QUALITY=$(echo "$RAW_OUTPUT" | sed -n '2p')
+QUALITY=$(echo "$RAW_OUTPUT" | { grep -i '^Quality:' || true; } | head -1)
+SUMMARY=$(echo "$RAW_OUTPUT" | { grep -vi '^Quality:' || true; } | { grep -v '^[[:space:]]*$' || true; } | head -1)
 
 if [ -z "${SUMMARY:-}" ]; then
   SUMMARY=$(echo "$COMMIT_MESSAGES" | head -1 | sed 's/^- //')
