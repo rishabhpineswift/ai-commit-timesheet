@@ -85,7 +85,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: rishabhpineswift/ai-commit-timesheet@v7
+      - uses: rishabhpineswift/ai-commit-timesheet@v8
         with:
           claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
@@ -109,7 +109,7 @@ its own token:
 3. Pass it to the action:
 
 ```yaml
-      - uses: rishabhpineswift/ai-commit-timesheet@v7
+      - uses: rishabhpineswift/ai-commit-timesheet@v8
         with:
           claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           central-repo: rishabhpineswift/timesheet-data
