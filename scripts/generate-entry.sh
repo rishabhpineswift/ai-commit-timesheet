@@ -49,16 +49,59 @@ FILES_CHANGED=${FILES_CHANGED:-0}
 INSERTIONS=${INSERTIONS:-0}
 DELETIONS=${DELETIONS:-0}
 
+# Per-author credit for the contributor logs: attribute lines to whoever
+# actually wrote them, not to whoever happened to merge/fast-forward them in.
+# A merge commit's own diff (against either parent, or the combined diff)
+# necessarily includes everything the incoming branch brought with it, so
+# there is no safe way to credit a merger's diff without also crediting them
+# for the other person's work. The fix: skip merge commits entirely — their
+# real content already exists as separate, individually-authored commits
+# elsewhere in this same range, each of which gets diffed against its own
+# parent and credited to its own author.
+declare -A AUTHOR_COMMITS AUTHOR_FILES AUTHOR_INS AUTHOR_DEL
+while IFS=$'\t' read -r sha author; do
+  [ -z "$sha" ] && continue
+  case "$author" in
+    ai-commit-timesheet-bot|github-actions|github-actions\[bot\]|*\[bot\]) continue ;;
+  esac
+
+  parent_count=$(($(git rev-list --parents -n1 "$sha" | wc -w) - 1))
+  if [ "$parent_count" -ge 2 ]; then
+    continue # merge commit — its real content is credited via its own parent commits
+  elif [ "$parent_count" -eq 1 ]; then
+    commit_stat=$(git diff --shortstat "${sha}^" "$sha" -- . \
+      ':(exclude)*.lock' ':(exclude)package-lock.json' ':(exclude)pnpm-lock.yaml' ':(exclude)yarn.lock')
+  else
+    commit_stat=$(git diff --shortstat "$EMPTY_TREE" "$sha" -- . \
+      ':(exclude)*.lock' ':(exclude)package-lock.json' ':(exclude)pnpm-lock.yaml' ':(exclude)yarn.lock')
+  fi
+
+  c_files=$(echo "$commit_stat" | grep -oE '[0-9]+ file' | grep -oE '[0-9]+' || echo 0)
+  c_ins=$(echo "$commit_stat" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
+  c_del=$(echo "$commit_stat" | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo 0)
+
+  AUTHOR_COMMITS["$author"]=$(( ${AUTHOR_COMMITS["$author"]:-0} + 1 ))
+  AUTHOR_FILES["$author"]=$(( ${AUTHOR_FILES["$author"]:-0} + ${c_files:-0} ))
+  AUTHOR_INS["$author"]=$(( ${AUTHOR_INS["$author"]:-0} + ${c_ins:-0} ))
+  AUTHOR_DEL["$author"]=$(( ${AUTHOR_DEL["$author"]:-0} + ${c_del:-0} ))
+done < <(git log $LOG_RANGE_LIMIT --pretty=format:'%H%x09%an' $LOG_RANGE; echo)
+
+AUTHOR_BREAKDOWN=""
+for author in "${!AUTHOR_COMMITS[@]}"; do
+  clean_author=$(echo "$author" | tr $',\t\n' '   ')
+  AUTHOR_BREAKDOWN+="${clean_author}"$'\t'"${AUTHOR_COMMITS[$author]}"$'\t'"${AUTHOR_FILES[$author]}"$'\t'"${AUTHOR_INS[$author]}"$'\t'"${AUTHOR_DEL[$author]}"$'\n'
+done
+
 PROMPT=$(cat <<EOF
 You are doing a quick code review of a git push for a team timesheet log.
 
 Base commit:  ${BASE_SHA}
 Head commit:  ${AFTER_SHA}
 You are in the repo working directory (already checked out at the head
-commit). Run \`git diff ${BASE_SHA} ${AFTER_SHA}\` yourself (and \`git show\`,
-\`git log\`, \`Read\`, \`Grep\`, \`Glob\` as needed) to actually look at what
-changed and understand it in context — don't just paraphrase the commit
-messages below.
+commit). Run git diff ${BASE_SHA} ${AFTER_SHA} yourself (and git show, git
+log, Read, Grep, Glob as needed) to actually look at what changed and
+understand it in context — do not just paraphrase the commit messages
+below.
 
 Commit messages (for context, not to be taken at face value):
 ${COMMIT_MESSAGES}
@@ -136,5 +179,8 @@ if [ -n "${GITHUB_ENV:-}" ]; then
     echo "TIMESHEET_QUALITY_RATING=${QUALITY_RATING}"
     echo "TIMESHEET_QUALITY_NOTES=${QUALITY_NOTES}"
     echo "TIMESHEET_AFTER_SHA=${AFTER_SHA}"
+    echo "TIMESHEET_AUTHOR_BREAKDOWN<<TIMESHEET_BREAKDOWN_EOF"
+    printf '%s' "$AUTHOR_BREAKDOWN"
+    echo "TIMESHEET_BREAKDOWN_EOF"
   } >> "$GITHUB_ENV"
 fi

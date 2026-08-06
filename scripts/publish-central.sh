@@ -57,15 +57,18 @@ regenerate_contributor_summary() {
 }
 
 # Appends a row to $1/log.csv (creating it with a header if needed) and
-# regenerates $1/summary.md from the full file.
+# regenerates $1/summary.md from the full file. Takes explicit commit/line
+# counts rather than reusing the push-level totals — a contributor's row
+# must reflect only the lines actually attributed to them (see the
+# per-author breakdown built in generate-entry.sh), not the whole push.
 append_and_summarize() {
-  local dir="$1" label="$2"
+  local dir="$1" label="$2" commits="$3" files="$4" ins="$5" del="$6"
   local log="${dir}/log.csv"
   mkdir -p "$dir"
   if [ ! -f "$log" ]; then
     echo "timestamp,project,branch,commits,files_changed,insertions,deletions,summary,quality_rating,quality_notes,after_sha" > "$log"
   fi
-  echo "\"${TIMESHEET_TIMESTAMP}\",\"${PROJECT_NAME}\",\"${TIMESHEET_BRANCH}\",${TIMESHEET_COMMITS},${TIMESHEET_FILES_CHANGED},${TIMESHEET_INSERTIONS},${TIMESHEET_DELETIONS},\"${TIMESHEET_SUMMARY}\",\"${QUALITY_RATING}\",\"${QUALITY_NOTES}\",\"${TIMESHEET_AFTER_SHA}\"" >> "$log"
+  echo "\"${TIMESHEET_TIMESTAMP}\",\"${PROJECT_NAME}\",\"${TIMESHEET_BRANCH}\",${commits},${files},${ins},${del},\"${TIMESHEET_SUMMARY}\",\"${QUALITY_RATING}\",\"${QUALITY_NOTES}\",\"${TIMESHEET_AFTER_SHA}\"" >> "$log"
   regenerate_contributor_summary "$dir" "$label"
 }
 
@@ -76,9 +79,13 @@ if [ ! -f "$DAILY_FILE" ]; then
 fi
 echo "\"${TIMESHEET_TIMESTAMP}\",\"${TIMESHEET_BRANCH}\",\"${TIMESHEET_AUTHORS}\",${TIMESHEET_COMMITS},${TIMESHEET_FILES_CHANGED},${TIMESHEET_INSERTIONS},${TIMESHEET_DELETIONS},\"${TIMESHEET_SUMMARY}\",\"${QUALITY_RATING}\",\"${QUALITY_NOTES}\",\"${TIMESHEET_AFTER_SHA}\"" >> "$DAILY_FILE"
 
-IFS=';' read -ra AUTHOR_LIST <<< "$TIMESHEET_AUTHORS"
-for author in "${AUTHOR_LIST[@]}"; do
-  author=$(echo "$author" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+# TIMESHEET_AUTHOR_BREAKDOWN is tab-separated per line: author, commits,
+# files, insertions, deletions — already limited to non-merge commits, each
+# credited to its own real author (see generate-entry.sh). A push where
+# someone only merged/fast-forwarded another person's branch produces no
+# line here for the merger; the original author's commits are attributed to
+# them directly.
+while IFS=$'\t' read -r author commits files ins del; do
   [ -z "$author" ] && continue
   SLUG=$(slugify "$author")
 
@@ -87,8 +94,9 @@ for author in "${AUTHOR_LIST[@]}"; do
   # need for a separate projects/<project>/contributors/<slug>/... tree.)
   append_and_summarize \
     "contributors/${SLUG}/${YEAR_UTC}/${MONTH_UTC}" \
-    "${SLUG} — ${YEAR_UTC}-${MONTH_UTC}"
-done
+    "${SLUG} — ${YEAR_UTC}-${MONTH_UTC}" \
+    "$commits" "$files" "$ins" "$del"
+done <<< "${TIMESHEET_AUTHOR_BREAKDOWN:-}"
 
 git add -A
 
