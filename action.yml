@@ -1,0 +1,61 @@
+name: "AI Commit Timesheet"
+description: "Logs a per-push timesheet entry (who, when, lines changed, AI-generated summary) to a CSV file in the repo."
+author: "rishabhpineswift"
+
+inputs:
+  claude-oauth-token:
+    description: "Claude Code OAuth token (from `claude setup-token`, tied to a Claude subscription/Team seat). If omitted, falls back to using the raw commit message as the summary."
+    required: false
+  timesheet-path:
+    description: "Path (relative to repo root) of the CSV file to append to."
+    required: false
+    default: "timesheet.csv"
+  max-diff-chars:
+    description: "Max characters of diff to send to Claude for summarization."
+    required: false
+    default: "8000"
+  commit-and-push:
+    description: "Whether the action should commit and push the updated CSV itself."
+    required: false
+    default: "true"
+  git-user-name:
+    description: "Git author name used for the automated commit."
+    required: false
+    default: "ai-commit-timesheet-bot"
+  git-user-email:
+    description: "Git author email used for the automated commit."
+    required: false
+    default: "ai-commit-timesheet-bot@users.noreply.github.com"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Claude Code CLI
+      if: ${{ inputs.claude-oauth-token != '' }}
+      shell: bash
+      run: npm install -g @anthropic-ai/claude-code
+
+    - name: Generate timesheet entry
+      shell: bash
+      env:
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-oauth-token }}
+        TIMESHEET_PATH: ${{ inputs.timesheet-path }}
+        MAX_DIFF_CHARS: ${{ inputs.max-diff-chars }}
+        BEFORE_SHA: ${{ github.event.before }}
+        AFTER_SHA: ${{ github.event.after }}
+        BRANCH_NAME: ${{ github.ref_name }}
+      run: ${{ github.action_path }}/scripts/generate-entry.sh
+
+    - name: Commit and push timesheet
+      if: ${{ inputs.commit-and-push == 'true' }}
+      shell: bash
+      run: |
+        if [ -z "$(git status --porcelain -- "${{ inputs.timesheet-path }}")" ]; then
+          echo "No timesheet changes to commit."
+          exit 0
+        fi
+        git config user.name "${{ inputs.git-user-name }}"
+        git config user.email "${{ inputs.git-user-email }}"
+        git add "${{ inputs.timesheet-path }}"
+        git commit -m "chore: update timesheet [skip ci]"
+        git push
