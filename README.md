@@ -85,7 +85,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: rishabhpineswift/ai-commit-timesheet@v8
+      - uses: rishabhpineswift/ai-commit-timesheet@v9
         with:
           claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
@@ -109,7 +109,7 @@ its own token:
 3. Pass it to the action:
 
 ```yaml
-      - uses: rishabhpineswift/ai-commit-timesheet@v8
+      - uses: rishabhpineswift/ai-commit-timesheet@v9
         with:
           claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           central-repo: rishabhpineswift/timesheet-data
@@ -143,3 +143,9 @@ its own copy of that PAT added as a secret (PATs aren't shared across repos).
   has branch protection requiring PRs, either exclude protected branches
   from the `on.push.branches` filter or set `commit-and-push: false` and
   wire up your own delivery (e.g. upload as a workflow artifact instead).
+- Contributor-log attribution (in `timesheet-data`) credits lines to whoever
+  actually authored the commit, not whoever merged/pulled it in — merge
+  commits are skipped entirely for this purpose, since their own diff would
+  otherwise include the incoming branch's changes too. Squash-merges are
+  attributed to whoever the squash commit's author field says (GitHub's
+  squash-merge button preserves the original PR author by default).
