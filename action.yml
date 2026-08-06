@@ -1,5 +1,5 @@
 name: "AI Commit Timesheet"
-description: "Logs a per-push timesheet entry (who, when, lines changed, AI-generated summary) to a CSV file in the repo."
+description: "Logs a per-push timesheet entry (who, when, lines changed, AI code-review summary) to a CSV file in the repo, and optionally to a central cross-project timesheet-data repo."
 author: "rishabhpineswift"
 
 inputs:
@@ -22,6 +22,16 @@ inputs:
     description: "Git author email used for the automated commit."
     required: false
     default: "ai-commit-timesheet-bot@users.noreply.github.com"
+  central-repo:
+    description: "owner/repo of a central timesheet-data repo to also publish per-project daily and per-contributor monthly rollups into. Leave empty to skip."
+    required: false
+  central-repo-token:
+    description: "Fine-grained PAT with contents:write on central-repo. Required if central-repo is set (the default GITHUB_TOKEN can't write to a different repo)."
+    required: false
+  project-name:
+    description: "Project name used as the folder key under projects/ in central-repo. Defaults to the current repo's name."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -40,6 +50,15 @@ runs:
         AFTER_SHA: ${{ github.event.after }}
         BRANCH_NAME: ${{ github.ref_name }}
       run: ${{ github.action_path }}/scripts/generate-entry.sh
+
+    - name: Publish to central timesheet repo
+      if: ${{ inputs.central-repo != '' }}
+      shell: bash
+      env:
+        CENTRAL_REPO: ${{ inputs.central-repo }}
+        CENTRAL_REPO_TOKEN: ${{ inputs.central-repo-token }}
+        PROJECT_NAME: ${{ inputs.project-name != '' && inputs.project-name || github.event.repository.name }}
+      run: ${{ github.action_path }}/scripts/publish-central.sh
 
     - name: Commit and push timesheet
       if: ${{ inputs.commit-and-push == 'true' }}

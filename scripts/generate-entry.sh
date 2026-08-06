@@ -37,7 +37,7 @@ if [ "$COMMIT_COUNT" = "0" ]; then
   exit 0
 fi
 
-AUTHORS=$(git log $LOG_RANGE_LIMIT --pretty=format:'%an' $LOG_RANGE | sort -u | paste -sd ';' -)
+AUTHORS=$(git log $LOG_RANGE_LIMIT --pretty=format:'%an' $LOG_RANGE | tr ',' ' ' | sort -u | paste -sd ';' -)
 COMMIT_MESSAGES=$(git log $LOG_RANGE_LIMIT --pretty=format:'- %s' $LOG_RANGE)
 TIMESTAMP=$(git log -1 --pretty=format:'%aI' "$AFTER_SHA")
 
@@ -94,3 +94,19 @@ fi
 echo "\"${TIMESTAMP}\",\"${BRANCH_NAME}\",\"${AUTHORS}\",${COMMIT_COUNT},${FILES_CHANGED},${INSERTIONS},${DELETIONS},\"${SUMMARY}\",\"${AFTER_SHA}\"" >> "$TIMESHEET_PATH"
 
 echo "Recorded timesheet entry for ${AFTER_SHA} on ${BRANCH_NAME}"
+
+# Hand the computed entry to later composite steps (e.g. publish-central.sh)
+if [ -n "${GITHUB_ENV:-}" ]; then
+  {
+    echo "TIMESHEET_RECORDED=true"
+    echo "TIMESHEET_TIMESTAMP=${TIMESTAMP}"
+    echo "TIMESHEET_BRANCH=${BRANCH_NAME}"
+    echo "TIMESHEET_AUTHORS=${AUTHORS}"
+    echo "TIMESHEET_COMMITS=${COMMIT_COUNT}"
+    echo "TIMESHEET_FILES_CHANGED=${FILES_CHANGED}"
+    echo "TIMESHEET_INSERTIONS=${INSERTIONS}"
+    echo "TIMESHEET_DELETIONS=${DELETIONS}"
+    echo "TIMESHEET_SUMMARY=${SUMMARY}"
+    echo "TIMESHEET_AFTER_SHA=${AFTER_SHA}"
+  } >> "$GITHUB_ENV"
+fi
