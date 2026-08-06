@@ -10,10 +10,6 @@ inputs:
     description: "Path (relative to repo root) of the CSV file to append to."
     required: false
     default: "timesheet.csv"
-  max-diff-chars:
-    description: "Max characters of diff to send to Claude for summarization."
-    required: false
-    default: "8000"
   commit-and-push:
     description: "Whether the action should commit and push the updated CSV itself."
     required: false
@@ -40,7 +36,6 @@ runs:
       env:
         CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-oauth-token }}
         TIMESHEET_PATH: ${{ inputs.timesheet-path }}
-        MAX_DIFF_CHARS: ${{ inputs.max-diff-chars }}
         BEFORE_SHA: ${{ github.event.before }}
         AFTER_SHA: ${{ github.event.after }}
         BRANCH_NAME: ${{ github.ref_name }}

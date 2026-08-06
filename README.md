@@ -2,8 +2,11 @@
 
 A reusable GitHub Action that logs one row per push to a `timesheet.csv` file
 in your repo: **who** pushed, **when**, **how many lines changed**, and a
-one-sentence **AI-generated summary** of what the push did. Drop it into any
-repo's workflow — no copy-pasted scripts, no shared server.
+one-line **AI code-review summary** of what the push actually does. Claude
+reads the real diff itself (via `git diff`/`git show`/`Read`/`Grep`, not a
+truncated text blob pasted into the prompt) and reports what changed and why
+— like a quick code review, not a paraphrase of the commit message. Drop it
+into any repo's workflow — no copy-pasted scripts, no shared server.
 
 It works with a **Claude subscription seat** (Pro/Max/Team) instead of an
 Anthropic API key, via `claude setup-token`.
@@ -88,7 +91,6 @@ commits it back with `[skip ci]` so it doesn't re-trigger the workflow.
 |---|---|---|
 | `claude-oauth-token` | *(none)* | Token from `claude setup-token`. If omitted, the raw commit message is used as the summary instead of an AI-generated one. |
 | `timesheet-path` | `timesheet.csv` | Where to write/append the log, relative to repo root. |
-| `max-diff-chars` | `8000` | How much of the diff to send to Claude for summarization. |
 | `commit-and-push` | `true` | Set `false` if you'd rather handle committing the file yourself (e.g. as part of a larger job). |
 | `git-user-name` / `git-user-email` | bot defaults | Identity used for the automated commit. |
 

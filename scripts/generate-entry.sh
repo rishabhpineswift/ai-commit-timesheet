@@ -3,7 +3,6 @@ set -euo pipefail
 
 # Inputs (env vars set by action.yml)
 : "${TIMESHEET_PATH:=timesheet.csv}"
-: "${MAX_DIFF_CHARS:=8000}"
 : "${BEFORE_SHA:?BEFORE_SHA is required}"
 : "${AFTER_SHA:?AFTER_SHA is required}"
 : "${BRANCH_NAME:?BRANCH_NAME is required}"
@@ -50,30 +49,36 @@ FILES_CHANGED=${FILES_CHANGED:-0}
 INSERTIONS=${INSERTIONS:-0}
 DELETIONS=${DELETIONS:-0}
 
-DIFF_FILE=$(mktemp)
-trap 'rm -f "$DIFF_FILE"' EXIT
-git diff "$BASE_SHA" "$AFTER_SHA" -- . \
-  ':(exclude)*.lock' ':(exclude)package-lock.json' ':(exclude)pnpm-lock.yaml' ':(exclude)yarn.lock' \
-  > "$DIFF_FILE"
-DIFF_TEXT=$(head -c "$MAX_DIFF_CHARS" "$DIFF_FILE")
-
 PROMPT=$(cat <<EOF
-You are summarizing a git push for a team timesheet log. Read the commit
-messages and diff below and reply with ONE short sentence (max ~20 words)
-describing what changed, in plain language a non-engineer manager could
-understand. Do not use any tools. Do not add preamble, quotes, or a trailing
-period-separated list — just the sentence.
+You are doing a quick code review of a git push for a team timesheet log.
 
-Commit messages:
+Base commit:  ${BASE_SHA}
+Head commit:  ${AFTER_SHA}
+You are in the repo working directory (already checked out at the head
+commit). Run \`git diff ${BASE_SHA} ${AFTER_SHA}\` yourself (and \`git show\`,
+\`git log\`, \`Read\`, \`Grep\`, \`Glob\` as needed) to actually look at what
+changed and understand it in context — don't just paraphrase the commit
+messages below.
+
+Commit messages (for context, not to be taken at face value):
 ${COMMIT_MESSAGES}
 
-Diff (may be truncated):
-${DIFF_TEXT}
+Write ONE line, under 40 words, for a non-engineer manager reading a
+timesheet: start with a category tag (Feature:/Fix:/Refactor:/Chore:/Docs:/
+Test:), then a plain-language sentence describing what the code actually
+does now and why, based on your own reading of the diff — not the commit
+message. If the diff looks risky, incomplete, or inconsistent with the
+commit message, say so briefly instead of just describing intent.
+
+Output ONLY that one line. No preamble, no markdown, no quotes, no
+newlines.
 EOF
 )
 
 if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
-  SUMMARY=$(claude -p "$PROMPT" --output-format text 2>/dev/null || echo "")
+  SUMMARY=$(claude -p "$PROMPT" --output-format text \
+    --allowedTools "Bash(git diff:*)" "Bash(git show:*)" "Bash(git log:*)" "Read" "Grep" "Glob" \
+    2>/dev/null || echo "")
 fi
 if [ -z "${SUMMARY:-}" ]; then
   SUMMARY=$(echo "$COMMIT_MESSAGES" | head -1 | sed 's/^- //')
