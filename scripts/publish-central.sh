@@ -80,12 +80,9 @@ for author in "${AUTHOR_LIST[@]}"; do
   [ -z "$author" ] && continue
   SLUG=$(slugify "$author")
 
-  # Per-project view: projects/<project>/contributors/<slug>/<year>/<month>/
-  append_and_summarize \
-    "projects/${PROJECT_NAME}/contributors/${SLUG}/${YEAR_UTC}/${MONTH_UTC}" \
-    "${SLUG} — ${PROJECT_NAME} — ${YEAR_UTC}-${MONTH_UTC}"
-
-  # Cross-project view: contributors/<slug>/<year>/<month>/
+  # contributors/<slug>/<year>/<month>/ — this person's pushes across all projects.
+  # (Their per-project activity is just this same data filtered by project — no
+  # need for a separate projects/<project>/contributors/<slug>/... tree.)
   append_and_summarize \
     "contributors/${SLUG}/${YEAR_UTC}/${MONTH_UTC}" \
     "${SLUG} — ${YEAR_UTC}-${MONTH_UTC}"
