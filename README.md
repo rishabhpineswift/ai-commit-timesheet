@@ -77,13 +77,40 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: rishabhpineswift/ai-commit-timesheet@v1
+      - uses: rishabhpineswift/ai-commit-timesheet@v2
         with:
           claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
 
 That's it. Every push (any branch) appends a row to `timesheet.csv` and
 commits it back with `[skip ci]` so it doesn't re-trigger the workflow.
+
+## Central timesheet-data repo (optional)
+
+If you have multiple project repos and want one place with a daily sheet
+per project and a monthly rollup per contributor, point this action at a
+central repo (see [rishabhpineswift/timesheet-data](https://github.com/rishabhpineswift/timesheet-data)
+for the folder structure it writes).
+
+The default `GITHUB_TOKEN` can't write to a *different* repo, so this needs
+its own token:
+
+1. Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new)
+   scoped to just the central repo, with **Contents: Read and write** permission.
+2. Add it as a secret in *this* (project) repo — e.g. `TIMESHEET_REPO_TOKEN`.
+3. Pass it to the action:
+
+```yaml
+      - uses: rishabhpineswift/ai-commit-timesheet@v2
+        with:
+          claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          central-repo: rishabhpineswift/timesheet-data
+          central-repo-token: ${{ secrets.TIMESHEET_REPO_TOKEN }}
+          # project-name: my-custom-name   # defaults to this repo's name
+```
+
+Every project repo that wants to report into the same central repo needs
+its own copy of that PAT added as a secret (PATs aren't shared across repos).
 
 ## Inputs
 
@@ -93,6 +120,9 @@ commits it back with `[skip ci]` so it doesn't re-trigger the workflow.
 | `timesheet-path` | `timesheet.csv` | Where to write/append the log, relative to repo root. |
 | `commit-and-push` | `true` | Set `false` if you'd rather handle committing the file yourself (e.g. as part of a larger job). |
 | `git-user-name` / `git-user-email` | bot defaults | Identity used for the automated commit. |
+| `central-repo` | *(none)* | `owner/repo` of a central timesheet-data repo to also publish into. Leave unset to skip. |
+| `central-repo-token` | *(none)* | Fine-grained PAT with `contents: write` on `central-repo`. Required if `central-repo` is set. |
+| `project-name` | this repo's name | Folder key used under `projects/` in the central repo. |
 
 ## Limitations / notes
 
