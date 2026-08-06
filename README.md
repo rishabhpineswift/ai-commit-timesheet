@@ -23,7 +23,15 @@ Anthropic API key, via `claude setup-token`.
 | insertions | 120 |
 | deletions | 34 |
 | summary | Added CSV export to the reports page |
+| quality_rating | Good / Fair / Poor / Unrated |
+| quality_notes | Missing error handling on the new API call |
 | after_sha | a1b2c3d... |
+
+`quality_rating`/`quality_notes` come from the same AI review pass — it
+judges the diff for obvious bugs, missing error handling, missing tests on
+risky logic, security issues, and code smells (not style preference).
+"Unrated" means the review step was skipped (no `claude-oauth-token`) or
+failed for that push.
 
 Note on "lines changed": since a lot of this code is AI-assisted, raw LOC is
 a weak productivity signal on its own. This action only *collects* the
@@ -77,7 +85,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: rishabhpineswift/ai-commit-timesheet@v4
+      - uses: rishabhpineswift/ai-commit-timesheet@v7
         with:
           claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
@@ -101,7 +109,7 @@ its own token:
 3. Pass it to the action:
 
 ```yaml
-      - uses: rishabhpineswift/ai-commit-timesheet@v4
+      - uses: rishabhpineswift/ai-commit-timesheet@v7
         with:
           claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           central-repo: rishabhpineswift/timesheet-data
