@@ -11,9 +11,9 @@ inputs:
     required: false
     default: "timesheet.csv"
   commit-and-push:
-    description: "Whether the action should commit and push the updated CSV itself."
+    description: "Whether the action should commit a per-repo timesheet.csv and push it back to this repo. Off by default — with central-repo set, that CSV is redundant clutter in every consuming repo; turn this on only if you want a local copy and have no central-repo."
     required: false
-    default: "true"
+    default: "false"
   git-user-name:
     description: "Git author name used for the automated commit."
     required: false

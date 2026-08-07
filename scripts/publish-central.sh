@@ -39,6 +39,28 @@ slugify() {
   echo "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
 }
 
+# A file created before developer_summary existed still has the old 11-column
+# header even after new 12-column rows get appended to it — parseCsv in the
+# portal maps values to headers positionally, so that mismatch silently
+# shifts quality_rating/quality_notes/after_sha one column to the right for
+# every row written after the column was added. Rewrite the header and
+# backfill old rows with an empty developer_summary so old and new rows line
+# up under the same 12-column schema.
+migrate_summary_schema() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+  grep -q "developer_summary" <(head -1 "$file") && return 0
+
+  local tmp
+  tmp=$(mktemp)
+  {
+    IFS= read -r old_header
+    echo "${old_header/summary,quality_rating/summary,developer_summary,quality_rating}"
+    awk -F',' 'BEGIN{OFS=","} { if (NF==11) { for(i=NF;i>=9;i--) $(i+1)=$i; $9="\"\""; NF=12 }; print }'
+  } < "$file" > "$tmp"
+  mv "$tmp" "$file"
+}
+
 regenerate_contributor_summary() {
   local dir="$1" label="$2"
   local log="$dir/log.csv" summary="$dir/summary.md"
@@ -66,6 +88,7 @@ append_and_summarize() {
   local dir="$1" label="$2" commits="$3" files="$4" ins="$5" del="$6"
   local log="${dir}/log.csv"
   mkdir -p "$dir"
+  migrate_summary_schema "$log"
   if [ ! -f "$log" ]; then
     echo "timestamp,project,branch,commits,files_changed,insertions,deletions,summary,developer_summary,quality_rating,quality_notes,after_sha" > "$log"
   fi
@@ -75,6 +98,7 @@ append_and_summarize() {
 
 DAILY_FILE="projects/${PROJECT_NAME}/daily/${DATE_UTC}.csv"
 mkdir -p "$(dirname "$DAILY_FILE")"
+migrate_summary_schema "$DAILY_FILE"
 if [ ! -f "$DAILY_FILE" ]; then
   echo "timestamp,branch,authors,commits,files_changed,insertions,deletions,summary,developer_summary,quality_rating,quality_notes,after_sha" > "$DAILY_FILE"
 fi

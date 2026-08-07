@@ -96,8 +96,11 @@ jobs:
           claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
 
-That's it. Every push (any branch) appends a row to `timesheet.csv` and
-commits it back with `[skip ci]` so it doesn't re-trigger the workflow.
+That's it. Every push (any branch) is now reviewed and logged. Nothing is
+committed back into this repo by default — point `central-repo` (below) at
+a shared data repo instead of cluttering every consuming repo with its own
+`timesheet.csv`. (Set `commit-and-push: true` if you actually want that
+local file — see Inputs below.)
 
 ## Central timesheet-data repo (optional)
 
@@ -131,8 +134,8 @@ its own copy of that PAT added as a secret (PATs aren't shared across repos).
 | input | default | description |
 |---|---|---|
 | `claude-oauth-token` | *(none)* | Token from `claude setup-token`. If omitted, the raw commit message is used as the summary instead of an AI-generated one. |
-| `timesheet-path` | `timesheet.csv` | Where to write/append the log, relative to repo root. |
-| `commit-and-push` | `true` | Set `false` if you'd rather handle committing the file yourself (e.g. as part of a larger job). |
+| `timesheet-path` | `timesheet.csv` | Where to write/append the log, relative to repo root. Only matters if `commit-and-push` is `true`. |
+| `commit-and-push` | `false` | Commit a per-repo `timesheet.csv` back to this repo. Off by default — redundant clutter once `central-repo` is set. |
 | `git-user-name` / `git-user-email` | bot defaults | Identity used for the automated commit. |
 | `central-repo` | *(none)* | `owner/repo` of a central timesheet-data repo to also publish into. Leave unset to skip. |
 | `central-repo-token` | *(none)* | Fine-grained PAT with `contents: write` on `central-repo`. Required if `central-repo` is set. |

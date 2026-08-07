@@ -162,6 +162,23 @@ QUALITY_RATING=$(echo "$QUALITY" | grep -oE '^Quality: [A-Za-z]+' | sed 's/^Qual
 QUALITY_NOTES=$(echo "$QUALITY" | sed -E 's/^Quality: [A-Za-z]+ ?—? ?//')
 
 mkdir -p "$(dirname "$TIMESHEET_PATH")" 2>/dev/null || true
+
+# A file written before developer_summary existed still has the old
+# 11-column header even after new 12-column rows get appended to it — any
+# reader mapping values to headers positionally would misread
+# quality_rating/quality_notes/after_sha one column to the right. Rewrite
+# the header and backfill old rows with an empty developer_summary so
+# everything lines up under the same 12-column schema.
+if [ -f "$TIMESHEET_PATH" ] && ! grep -q "developer_summary" <(head -1 "$TIMESHEET_PATH"); then
+  TMP_TIMESHEET=$(mktemp)
+  {
+    IFS= read -r old_header
+    echo "${old_header/summary,quality_rating/summary,developer_summary,quality_rating}"
+    awk -F',' 'BEGIN{OFS=","} { if (NF==11) { for(i=NF;i>=9;i--) $(i+1)=$i; $9="\"\""; NF=12 }; print }'
+  } < "$TIMESHEET_PATH" > "$TMP_TIMESHEET"
+  mv "$TMP_TIMESHEET" "$TIMESHEET_PATH"
+fi
+
 if [ ! -f "$TIMESHEET_PATH" ]; then
   echo "timestamp,branch,authors,commits,files_changed,insertions,deletions,summary,developer_summary,quality_rating,quality_notes,after_sha" > "$TIMESHEET_PATH"
 fi
