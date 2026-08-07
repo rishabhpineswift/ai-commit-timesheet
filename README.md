@@ -23,9 +23,15 @@ Anthropic API key, via `claude setup-token`.
 | insertions | 120 |
 | deletions | 34 |
 | summary | Added CSV export to the reports page |
+| developer_summary | Add CSV export button to reports page |
 | quality_rating | Good / Fair / Poor / Unrated |
 | quality_notes | Missing error handling on the new API call |
 | after_sha | a1b2c3d... |
+
+`developer_summary` is the commit's own heading + description, verbatim from
+the developer — separate from `summary`, which is Claude's independent read
+of the actual diff. Comparing the two shows whether what a developer said
+they did matches what really changed.
 
 `quality_rating`/`quality_notes` come from the same AI review pass — it
 judges the diff for obvious bugs, missing error handling, missing tests on
