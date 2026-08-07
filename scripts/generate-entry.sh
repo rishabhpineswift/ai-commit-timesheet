@@ -39,6 +39,11 @@ fi
 
 AUTHORS=$(git log $LOG_RANGE_LIMIT --pretty=format:'%an' $LOG_RANGE | tr ',' ' ' | { grep -viE '^(ai-commit-timesheet-bot|github-actions(\[bot\])?|.*\[bot\])$' || true; } | sort -u | paste -sd ';' -)
 COMMIT_MESSAGES=$(git log $LOG_RANGE_LIMIT --pretty=format:'- %s' $LOG_RANGE)
+# The developer's own words (commit heading + description), as opposed to
+# SUMMARY below which is the AI's independent read of the diff — shown in the
+# portal as a separate "Developer Summary" column so a manager can compare
+# what the developer said they did against what the AI actually saw.
+DEV_SUMMARY=$(git log $LOG_RANGE_LIMIT --pretty=format:'%s%n%b' $LOG_RANGE)
 TIMESTAMP=$(git log -1 --pretty=format:'%aI' "$AFTER_SHA")
 
 SHORTSTAT=$(git diff --shortstat "$BASE_SHA" "$AFTER_SHA")
@@ -152,15 +157,16 @@ fi
 
 SUMMARY=$(echo "$SUMMARY" | tr '\n' ' ' | tr ',' ';' | sed -e 's/"/'"'"'/g' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 QUALITY=$(echo "$QUALITY" | tr '\n' ' ' | tr ',' ';' | sed -e 's/"/'"'"'/g' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+DEV_SUMMARY=$(echo "$DEV_SUMMARY" | tr '\n' ' ' | tr ',' ';' | sed -e 's/"/'"'"'/g' -e 's/  */ /g' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 QUALITY_RATING=$(echo "$QUALITY" | grep -oE '^Quality: [A-Za-z]+' | sed 's/^Quality: //' || echo "Unrated")
 QUALITY_NOTES=$(echo "$QUALITY" | sed -E 's/^Quality: [A-Za-z]+ ?—? ?//')
 
 mkdir -p "$(dirname "$TIMESHEET_PATH")" 2>/dev/null || true
 if [ ! -f "$TIMESHEET_PATH" ]; then
-  echo "timestamp,branch,authors,commits,files_changed,insertions,deletions,summary,quality_rating,quality_notes,after_sha" > "$TIMESHEET_PATH"
+  echo "timestamp,branch,authors,commits,files_changed,insertions,deletions,summary,developer_summary,quality_rating,quality_notes,after_sha" > "$TIMESHEET_PATH"
 fi
 
-echo "\"${TIMESTAMP}\",\"${BRANCH_NAME}\",\"${AUTHORS}\",${COMMIT_COUNT},${FILES_CHANGED},${INSERTIONS},${DELETIONS},\"${SUMMARY}\",\"${QUALITY_RATING}\",\"${QUALITY_NOTES}\",\"${AFTER_SHA}\"" >> "$TIMESHEET_PATH"
+echo "\"${TIMESTAMP}\",\"${BRANCH_NAME}\",\"${AUTHORS}\",${COMMIT_COUNT},${FILES_CHANGED},${INSERTIONS},${DELETIONS},\"${SUMMARY}\",\"${DEV_SUMMARY}\",\"${QUALITY_RATING}\",\"${QUALITY_NOTES}\",\"${AFTER_SHA}\"" >> "$TIMESHEET_PATH"
 
 echo "Recorded timesheet entry for ${AFTER_SHA} on ${BRANCH_NAME}"
 
@@ -176,6 +182,7 @@ if [ -n "${GITHUB_ENV:-}" ]; then
     echo "TIMESHEET_INSERTIONS=${INSERTIONS}"
     echo "TIMESHEET_DELETIONS=${DELETIONS}"
     echo "TIMESHEET_SUMMARY=${SUMMARY}"
+    echo "TIMESHEET_DEV_SUMMARY=${DEV_SUMMARY}"
     echo "TIMESHEET_QUALITY_RATING=${QUALITY_RATING}"
     echo "TIMESHEET_QUALITY_NOTES=${QUALITY_NOTES}"
     echo "TIMESHEET_AFTER_SHA=${AFTER_SHA}"
